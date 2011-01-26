@@ -35,6 +35,9 @@ class Socket {
 	}
 	*/
 	
+   function onHandshakeResult(verify: Verify, peer_name: String) {
+   }
+
 	public function connect( host : Host, port : Int ) {
 		try {
 			socket_connect(__s, host.ip, port);
@@ -44,6 +47,14 @@ class Socket {
 			var sbio = BIO_new_socket( __s, BIO_NOCLOSE() );
 			SSL_set_bio( ssl, sbio, sbio );
 			var rsc : Int = SSL_connect(ssl);
+
+         var vfy: Int = SSL_get_verify_result(ssl);
+         var peername: String = neko.Lib.nekoToHaxe(peer_common_name(ssl));
+
+         onHandshakeResult(
+               vfy == 0 ? Verify.V_Ok : Verify.V_Err(vfy),
+               peername );
+
 		} catch( e : String ) {
 			if( e == "std@socket_connect" )
 				throw "Failed to connect on "+(try host.reverse() catch( e : Dynamic ) host.toString() ) +":" + port;
@@ -114,6 +125,11 @@ class Socket {
 		SSL_load_error_strings();
 		ctx = SSL_CTX_new( SSLv23_client_method() );
 		var rsclvl : Int = SSL_CTX_load_verify_locations( ctx, neko.Lib.haxeToNeko( certFolder ) );
+
+      if (rsclvl == 0) {
+         // TODO more sophicticated exceptions?
+         throw "ssl-cert";
+      }
 	}
 
 	public static function select( read : Array<Socket>, write : Array<Socket>, others : Array<Socket>, timeout : Float )
@@ -173,6 +189,7 @@ class Socket {
 	static var SSL_library_init = Loader.load( "_SSL_library_init", 0 );
 	static var SSL_CTX_new = Loader.load( "_SSL_CTX_new", 1 );
 	static var SSL_CTX_load_verify_locations = Loader.load( "_SSL_CTX_load_verify_locations", 2 );
+	static var SSL_get_verify_result = Loader.load( "_SSL_get_verify_result", 1 );
 	static var SSLv23_client_method = Loader.load( "_SSLv23_client_method", 0 );
 	static var SSL_new = Loader.load( "_SSL_new", 1 );
 	static var BIO_new_socket = Loader.load( "_BIO_new_socket", 2 );
@@ -181,6 +198,8 @@ class Socket {
 	static var SSL_connect = Loader.load( "_SSL_connect", 1 );
 	static var SSL_set_fd = Loader.load ( "_SSL_set_fd", 2 );
 	static var SSL_CTX_set_verify_depth = Loader.load(  "_SSL_CTX_set_verify_depth", 2 );
+
+   static var peer_common_name = Loader.load( "peer_common_name", 1);
 
 	static var BIO_new = Loader.load( "_BIO_new", 1 );
 	static var BIO_set_fd = Loader.load( "_BIO_set_fd", 3 );

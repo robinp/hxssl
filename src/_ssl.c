@@ -10,6 +10,7 @@ DEFINE_KIND( k_ssl_ctx_pointer);
 DEFINE_KIND( k_ssl_method_pointer);
 DEFINE_KIND( k_ssl);
 DEFINE_KIND( k_ssl_ctx);
+DEFINE_KIND( k_cert);
 
 //void	SSL_load_error_strings(void );
 value _SSL_load_error_strings() {
@@ -105,6 +106,42 @@ value _SSL_set_fd(value s, value fd) {
 value _SSL_CTX_set_verify_depth(value ctx, value depth) {
 	SSL_CTX_set_verify_depth((SSL_CTX*) val_data(ctx), val_int(depth));
 	return VAL_VOID;
+}
+
+//long SSL_get_verify_result(const SSL *ssl);
+value _SSL_get_verify_result(value ssl) {
+   int res = SSL_get_verify_result((SSL*) val_data(ssl));
+   return alloc_int(res);
+}
+
+//X509 *SSL_get_peer_certificate(const SSL *ssl);
+value _SSL_get_peer_certificate(value ssl) {
+   X509 *cert = SSL_get_peer_certificate((SSL*) val_data(ssl));
+   if (cert == NULL) {
+      return val_null;
+   }
+   return alloc_abstract(k_cert, cert);
+}
+
+// SSL -> String
+value peer_common_name(value ssl) {
+   const int LEN = 512;
+   char buf[LEN];
+   X509 *cert;
+   X509_NAME *name;
+   
+   cert = SSL_get_peer_certificate((SSL*) val_data(ssl));
+
+   if (cert == NULL) {
+      return val_null;
+   }
+
+   name = X509_get_subject_name(cert);
+
+   buf[0] = 0;
+   X509_NAME_get_text_by_NID(name, NID_commonName, buf, LEN);
+
+   return alloc_string(buf);
 }
 
 //int 	SSL_read(SSL *ssl,void *buf,int num);
@@ -233,6 +270,8 @@ DEFINE_PRIM(_BIO_NOCLOSE, 0);
 DEFINE_PRIM(_SSL_connect, 1);
 DEFINE_PRIM(_SSL_set_fd, 2);
 DEFINE_PRIM(_SSL_CTX_set_verify_depth, 2);
+DEFINE_PRIM(_SSL_get_verify_result, 1);
+DEFINE_PRIM(peer_common_name, 1);
 DEFINE_PRIM(_SSL_read, 3);
 DEFINE_PRIM(_SSL_write, 3);
 DEFINE_PRIM(__SSL_write, 2);

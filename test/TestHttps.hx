@@ -1,5 +1,6 @@
 import neko.Lib;
 import neko.tls.Socket;
+import neko.tls.Verify;
 
 class ClosableBytesOutput extends haxe.io.BytesOutput {
 
@@ -13,6 +14,29 @@ class ClosableBytesOutput extends haxe.io.BytesOutput {
    dynamic public function onClose() {}
 }
 
+class VerifyingSocket extends Socket {
+
+   public function new(hostname: String) {
+      super();
+      this.hostname = hostname;
+   }
+
+   override function onHandshakeResult(verify: Verify, peer_name: String) {
+      switch (verify) {
+         case V_Err(code):
+            throw "verify error, code = " + code;
+
+         case V_Ok:
+            if (hostname != peer_name) {
+               throw "verify error, connected to " + hostname + " but got " + peer_name;
+            }
+      }
+   }
+
+   var hostname: String;
+
+}
+
 class TestHttps {
 	static function main() {
 
@@ -24,7 +48,8 @@ class TestHttps {
       }
 
       var parts = args[0].split("/");
-      var url = parts.shift() + ":443" + 
+      var hostname = parts.shift();
+      var url = hostname + ":443" + 
             if (parts.length == 0) ""
             else "/" + parts.join("/")
             ;
@@ -53,7 +78,7 @@ class TestHttps {
 		}
 		
       trace("Before async request");
-		https.customRequest(false, output, new Socket());
+		https.customRequest(false, output, new VerifyingSocket(hostname) );
 		trace("After async request");		
 	}
 }
